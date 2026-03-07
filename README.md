@@ -1,6 +1,7 @@
+<div align="center">
+
 # FREE-FS
 
-<div align="center">
 **A production-grade distributed file system — Google File System architecture, built from scratch.**
 
 [![CI](https://github.com/s4nj1th/free-fs/actions/workflows/ci.yml/badge.svg)](https://github.com/s4nj1th/free-fs/actions/workflows/ci.yml)
