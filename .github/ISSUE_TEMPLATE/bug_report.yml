@@ -1,0 +1,66 @@
+name: "🐛 Bug Report"
+description: Something isn't working
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please fill this out as completely as possible.
+  - type: input
+    id: version
+    attributes:
+      label: FREE-FS Version
+      placeholder: "e.g. v1.0.0 or git sha"
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Master Server
+        - Chunk Server
+        - CLI
+        - Docker / docker-compose
+        - Proto / gRPC
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      placeholder: Describe the bug clearly
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `./free-fs.sh up`
+        2. Run `./free-fs.sh put ...`
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Output
+      render: shell
+      placeholder: Paste relevant logs here
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      placeholder: |
+        OS: Ubuntu 22.04
+        Docker: 24.0.5
+        Go: 1.21
+        Python: 3.11

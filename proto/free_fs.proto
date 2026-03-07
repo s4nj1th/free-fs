@@ -1,0 +1,158 @@
+syntax = "proto3";
+package free_fs;
+option go_package = "github.com/free-fs/free-fs/proto";
+// ─── Master Service ──────────────────────────────────────────────────────────
+service Master {
+  rpc OpenFile        (OpenFileRequest)        returns (OpenFileResponse);
+  rpc DeleteFile      (DeleteFileRequest)      returns (DeleteFileResponse);
+  rpc ListFiles       (ListFilesRequest)       returns (ListFilesResponse);
+  rpc GetChunkLocations(ChunkLocationRequest)  returns (ChunkLocationResponse);
+  rpc RegisterChunkServer(RegisterRequest)     returns (RegisterResponse);
+  rpc Heartbeat       (HeartbeatRequest)       returns (HeartbeatResponse);
+  rpc ReportChunks    (ReportChunksRequest)    returns (ReportChunksResponse);
+  rpc GetFileInfo     (GetFileInfoRequest)     returns (GetFileInfoResponse);
+  rpc CreateDirectory (CreateDirRequest)       returns (CreateDirResponse);
+  rpc ListDirectory   (ListDirRequest)         returns (ListDirResponse);
+  rpc MoveFile        (MoveFileRequest)        returns (MoveFileResponse);
+  rpc GetClusterStatus(ClusterStatusRequest)   returns (ClusterStatusResponse);
+}
+// ─── ChunkServer Service ─────────────────────────────────────────────────────
+service ChunkServer {
+  rpc WriteChunk      (WriteChunkRequest)      returns (WriteChunkResponse);
+  rpc ReadChunk       (ReadChunkRequest)       returns (ReadChunkResponse);
+  rpc DeleteChunk     (DeleteChunkRequest)     returns (DeleteChunkResponse);
+  rpc ReplicateChunk  (ReplicateChunkRequest)  returns (ReplicateChunkResponse);
+  rpc GetChunkInfo    (GetChunkInfoRequest)    returns (GetChunkInfoResponse);
+}
+// ─── Messages ────────────────────────────────────────────────────────────────
+message OpenFileRequest {
+  string path     = 1;
+  string mode     = 2; // "r", "w", "rw", "create"
+  int64  file_size = 3;
+}
+message OpenFileResponse {
+  string          file_id    = 1;
+  string          path       = 2;
+  repeated Chunk  chunks     = 3;
+  bool            success    = 4;
+  string          error      = 5;
+  int64           file_size  = 6;
+}
+message Chunk {
+  string         chunk_id  = 1;
+  int64          index     = 2;
+  repeated string locations = 3; // chunkserver addresses
+  string         primary   = 4; // primary chunkserver
+  int64          size      = 5;
+  int64          version   = 6;
+}
+message DeleteFileRequest  { string path    = 1; }
+message DeleteFileResponse { bool success   = 1; string error = 2; }
+message ListFilesRequest   { string pattern = 1; }
+message ListFilesResponse  { repeated FileInfo files = 1; }
+message FileInfo {
+  string path       = 1;
+  int64  size       = 2;
+  int64  created_at = 3;
+  int64  updated_at = 4;
+  int64  chunk_count = 5;
+  string owner      = 6;
+}
+message ChunkLocationRequest  { string file_id = 1; int64 chunk_index = 2; }
+message ChunkLocationResponse { Chunk chunk = 1; bool success = 2; string error = 3; }
+message RegisterRequest {
+  string address    = 1;
+  string server_id  = 2;
+  int64  capacity   = 3;
+  int64  available  = 4;
+}
+message RegisterResponse {
+  bool   success   = 1;
+  string server_id = 2;
+  string error     = 3;
+}
+message HeartbeatRequest {
+  string server_id  = 1;
+  int64  available  = 2;
+  int64  used       = 3;
+  int64  chunk_count = 4;
+  float  cpu_usage  = 5;
+  float  mem_usage  = 6;
+}
+message HeartbeatResponse {
+  bool   alive   = 1;
+  repeated string chunks_to_delete = 2;
+}
+message ReportChunksRequest {
+  string server_id      = 1;
+  repeated ChunkReport chunks = 2;
+}
+message ChunkReport {
+  string chunk_id = 1;
+  int64  size     = 2;
+  int64  version  = 3;
+}
+message ReportChunksResponse { bool success = 1; }
+message GetFileInfoRequest  { string path = 1; }
+message GetFileInfoResponse { FileInfo info = 1; bool success = 2; string error = 3; }
+message CreateDirRequest    { string path = 1; }
+message CreateDirResponse   { bool success = 1; string error = 2; }
+message ListDirRequest      { string path = 1; }
+message ListDirResponse     { repeated string entries = 1; bool success = 2; string error = 3; }
+message MoveFileRequest     { string src = 1; string dst = 2; }
+message MoveFileResponse    { bool success = 1; string error = 2; }
+message ClusterStatusRequest {}
+message ClusterStatusResponse {
+  repeated ChunkServerStatus servers = 1;
+  int64 total_files   = 2;
+  int64 total_chunks  = 3;
+  int64 total_capacity = 4;
+  int64 used_capacity  = 5;
+}
+message ChunkServerStatus {
+  string server_id    = 1;
+  string address      = 2;
+  bool   alive        = 3;
+  int64  capacity     = 4;
+  int64  available    = 5;
+  int64  chunk_count  = 6;
+  float  cpu_usage    = 7;
+  float  mem_usage    = 8;
+  int64  last_heartbeat = 9;
+}
+// ─── ChunkServer Messages ────────────────────────────────────────────────────
+message WriteChunkRequest {
+  string chunk_id = 1;
+  int64  offset   = 2;
+  bytes  data     = 3;
+  int64  version  = 4;
+}
+message WriteChunkResponse {
+  bool   success   = 1;
+  string error     = 2;
+  int64  bytes_written = 3;
+}
+message ReadChunkRequest {
+  string chunk_id = 1;
+  int64  offset   = 2;
+  int64  length   = 3;
+}
+message ReadChunkResponse {
+  bytes  data    = 1;
+  bool   success = 2;
+  string error   = 3;
+}
+message DeleteChunkRequest  { string chunk_id = 1; }
+message DeleteChunkResponse { bool success = 1; string error = 2; }
+message ReplicateChunkRequest {
+  string chunk_id      = 1;
+  string source_addr   = 2;
+}
+message ReplicateChunkResponse { bool success = 1; string error = 2; }
+message GetChunkInfoRequest  { string chunk_id = 1; }
+message GetChunkInfoResponse {
+  string chunk_id = 1;
+  int64  size     = 2;
+  int64  version  = 3;
+  bool   exists   = 4;
+}

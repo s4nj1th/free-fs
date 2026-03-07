@@ -1,0 +1,141 @@
+version: "3.9"
+
+services:
+  master:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.master
+
+    container_name: free-fs-master
+
+    hostname: master
+
+    ports:
+      - "50051:50051"
+
+    environment:
+      MASTER_PORT: "50051"
+
+    volumes:
+      - free_fs_master_data:/data
+
+    networks:
+      free_fs_net:
+        aliases:
+          - master
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "50051"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  chunk1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.chunk
+    container_name: free-fs-chunk1
+    hostname: chunk1
+    ports:
+      - "50052:50052"
+
+    environment:
+      MASTER_ADDR: "master:50051"
+      CHUNK_PORT: "50052"
+      SERVER_ID: "chunk1"
+      SELF_ADDR: "chunk1:50052"
+
+    volumes:
+      - free_fs_chunk1_data:/data
+
+    networks:
+      - free_fs_net
+
+    depends_on:
+      master:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+  chunk2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.chunk
+
+    container_name: free-fs-chunk2
+
+    hostname: chunk2
+
+    ports:
+      - "50053:50052"
+
+    environment:
+      MASTER_ADDR: "master:50051"
+      CHUNK_PORT: "50052"
+      SERVER_ID: "chunk2"
+      SELF_ADDR: "chunk2:50052"
+
+    volumes:
+      - free_fs_chunk2_data:/data
+
+    networks:
+      - free_fs_net
+
+    depends_on:
+      master:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+  chunk3:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.chunk
+    container_name: free-fs-chunk3
+    hostname: chunk3
+    ports:
+      - "50054:50052"
+    environment:
+      MASTER_ADDR: "master:50051"
+      CHUNK_PORT: "50052"
+      SERVER_ID: "chunk3"
+      SELF_ADDR: "chunk3:50052"
+    volumes:
+      - free_fs_chunk3_data:/data
+    networks:
+      - free_fs_net
+    depends_on:
+      master:
+        condition: service_healthy
+    restart: unless-stopped
+  cli:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cli
+    container_name: free-fs-cli
+    environment:
+      FREE_FS_MASTER: "master:50051"
+    networks:
+      - free_fs_net
+    depends_on:
+      - master
+    profiles:
+      - cli
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./cli_data:/workspace
+volumes:
+  free_fs_master_data:
+  free_fs_chunk1_data:
+  free_fs_chunk2_data:
+  free_fs_chunk3_data:
+networks:
+  free_fs_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

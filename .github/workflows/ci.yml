@@ -1,0 +1,186 @@
+name: CI
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+jobs:
+  go-lint:
+    name: Go Lint & Vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+          cache: true
+      - name: Install protoc
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q protobuf-compiler
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          echo "$HOME/go/bin" >> $GITHUB_PATH
+      - name: Generate proto stubs
+        run: |
+          protoc \
+            --go_out=. \
+            --go_opt=paths=source_relative \
+            --go-grpc_out=. \
+            --go-grpc_opt=paths=source_relative \
+            proto/free_fs.proto
+      - name: Download dependencies
+        run: go mod tidy && go mod download
+      - name: Go vet
+        run: go vet ./...
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          args: --timeout=5m
+
+  build-go:
+    name: Build Go Binaries
+    runs-on: ubuntu-latest
+    needs: go-lint
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+          cache: true
+      - name: Install protoc
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q protobuf-compiler
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          echo "$HOME/go/bin" >> $GITHUB_PATH
+      - name: Generate proto stubs
+        run: |
+          protoc \
+            --go_out=. --go_opt=paths=source_relative \
+            --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+            proto/free_fs.proto
+      - name: Build master
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          EXT=""
+          [ "$GOOS" = "windows" ] && EXT=".exe"
+          mkdir -p dist
+          go build -ldflags="-s -w -X main.Version=${{ github.sha }}" \
+            -o dist/free-fs-master-${{ matrix.goos }}-${{ matrix.goarch }}${EXT} \
+            ./master/
+      - name: Build chunkserver
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          EXT=""
+          [ "$GOOS" = "windows" ] && EXT=".exe"
+          go build -ldflags="-s -w -X main.Version=${{ github.sha }}" \
+            -o dist/free-fs-chunk-${{ matrix.goos }}-${{ matrix.goarch }}${EXT} \
+            ./chunkserver/
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/
+
+  python-lint:
+    name: Python CLI Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install deps
+        run: pip install -r cli/requirements.txt ruff
+      - name: Ruff lint
+        run: ruff check cli/free_fs_cli.py
+
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build master image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.master
+          push: false
+          tags: free-fs-master:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build chunk image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.chunk
+          push: false
+          tags: free-fs-chunk:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build CLI image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.cli
+          push: false
+          tags: free-fs-cli:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  integration:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    needs: docker-build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start cluster
+        run: |
+          docker compose -f docker/docker-compose.yml up -d master chunk1 chunk2 chunk3
+          sleep 15  # Wait for chunk servers to register
+      - name: Check cluster status
+        run: |
+          docker compose -f docker/docker-compose.yml run --rm \
+            -e FREE_FS_MASTER=master:50051 \
+            cli status
+      - name: Upload test file
+        run: |
+          echo "Hello FREE-FS! Integration test ${{ github.sha }}" > /tmp/test.txt
+          docker compose -f docker/docker-compose.yml run --rm \
+            -v /tmp:/workspace \
+            -e FREE_FS_MASTER=master:50051 \
+            cli put /workspace/test.txt /ci/test.txt
+      - name: Download and verify
+        run: |
+          docker compose -f docker/docker-compose.yml run --rm \
+            -v /tmp:/workspace \
+            -e FREE_FS_MASTER=master:50051 \
+            cli get /ci/test.txt /workspace/test_out.txt
+          diff /tmp/test.txt /tmp/test_out.txt && echo "✓ File integrity verified"
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker/docker-compose.yml down -v

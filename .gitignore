@@ -1,0 +1,53 @@
+# Binaries
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go
+*.test
+*.out
+vendor/
+go.sum
+
+# Generated proto stubs (built during docker/CI)
+proto/*.pb.go
+proto/*_pb2.py
+proto/*_pb2_grpc.py
+proto/__pycache__/
+proto/__init__.py
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Docker
+docker/cli_data/
+docker/workspace/
+
+# Data directories
+data/
+/data/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+
+# Test artifacts
+/tmp/free_fs_*
