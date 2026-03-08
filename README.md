@@ -22,27 +22,10 @@ Built with **Go** (master + chunk servers), **gRPC** (inter-service), **Docker**
 
 ## Architecture
 
-```
-┌────────────────────────────────────────────────────────────────────┐
-│                         FREE-FS Cluster                            │
-│                                                                    │
-│   ┌──────────────────┐   gRPC    ┌──────────────────────────────┐  │
-│   │   CLI Client     │ <──────>  │       Master Server          │  │
-│   │   (Python/Rich)  │           │  • Namespace (dirs/files)    │  │
-│   └──────────────────┘           │  • Chunk->Server mappings    │  │
-│                                  │  • Heartbeat monitoring      │  │
-│                                  │  • Re-replication on failure │  │
-│                                  │  • Persistent state (JSON)   │  │
-│                                  └──────────────┬───────────────┘  │
-│                                                 │ Register/Beat    │
-│                                   ┌─────────────┼─────────────┐    │
-│                                   v             v             v    │
-│                          ┌─────────────┐ ┌──────────┐ ┌──────────┐ │
-│                          │  Chunk S1   │ │ Chunk S2 │ │ Chunk S3 │ │
-│                          │ :50052      │ │ :50053   │ │ :50054   │ │
-│                          └─────────────┘ └──────────┘ └──────────┘ │
-└────────────────────────────────────────────────────────────────────┘
-```
+<div align="center">
+    <img src="docs/architecture-diagram.png" />
+</div>
+
 
 ### GFS Features Implemented
 
