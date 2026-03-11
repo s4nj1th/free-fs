@@ -1,0 +1,71 @@
+version: '3.8'
+services:
+  master:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.node
+    container_name: free-fs-master-1
+    environment:
+      - NODE_ID=4
+    networks:
+      free_fs_net:
+        ipv4_address: 172.28.0.14
+    ports:
+      - "50051:50051"
+
+  chunkserver-1:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.node
+    container_name: free-fs-chunkserver-1
+    environment:
+      - NODE_ID=1
+    networks:
+      free_fs_net:
+        ipv4_address: 172.28.0.11
+    ports:
+      - "50052:50051"
+
+  chunkserver-2:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.node
+    container_name: free-fs-chunkserver-2
+    environment:
+      - NODE_ID=2
+    networks:
+      free_fs_net:
+        ipv4_address: 172.28.0.12
+    ports:
+      - "50053:50051"
+
+  chunkserver-3:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.node
+    container_name: free-fs-chunkserver-3
+    environment:
+      - NODE_ID=3
+    networks:
+      free_fs_net:
+        ipv4_address: 172.28.0.13
+    ports:
+      - "50054:50051"
+
+  client:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.client
+    container_name: free-fs-client-1
+    networks:
+      free_fs_net:
+        ipv4_address: 172.28.0.10
+    stdin_open: true
+    tty: true
+
+networks:
+  free_fs_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
