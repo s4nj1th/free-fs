@@ -55,17 +55,17 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           mkdir -p dist
-          LDFLAGS="-s -w -X main.Version=${VERSION}"
+          LDFLAGS="-s -w"
           go build -ldflags="${LDFLAGS}" \
-            -o dist/free-fs-master-${{ matrix.suffix }}${{ matrix.ext || '' }} ./master/
+            -o dist/free-fs-node-${{ matrix.suffix }}${{ matrix.ext || '' }} ./cmd/node/
           go build -ldflags="${LDFLAGS}" \
-            -o dist/free-fs-chunk-${{ matrix.suffix }}${{ matrix.ext || '' }} ./chunkserver/
+            -o dist/free-fs-client-${{ matrix.suffix }}${{ matrix.ext || '' }} ./cmd/client/
       - name: Create archive
         run: |
           cd dist
           tar -czf free-fs-${{ matrix.suffix }}.tar.gz \
-            free-fs-master-${{ matrix.suffix }}* \
-            free-fs-chunk-${{ matrix.suffix }}*
+            free-fs-node-${{ matrix.suffix }}* \
+            free-fs-client-${{ matrix.suffix }}*
       - uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.suffix }}
@@ -89,39 +89,29 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/${{ github.repository }}/master
-            ghcr.io/${{ github.repository }}/chunk
+            ghcr.io/${{ github.repository }}/node
+            ghcr.io/${{ github.repository }}/client
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
-      - name: Build and push master
+      - name: Build and push node
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: docker/Dockerfile.master
+          file: docker/Dockerfile.node
           push: true
-          tags: ghcr.io/${{ github.repository }}/master:${{ github.ref_name }},ghcr.io/${{ github.repository }}/master:latest
+          tags: ghcr.io/${{ github.repository }}/node:${{ github.ref_name }},ghcr.io/${{ github.repository }}/node:latest
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Build and push chunk
+      - name: Build and push client
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: docker/Dockerfile.chunk
+          file: docker/Dockerfile.client
           push: true
-          tags: ghcr.io/${{ github.repository }}/chunk:${{ github.ref_name }},ghcr.io/${{ github.repository }}/chunk:latest
-          platforms: linux/amd64,linux/arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Build and push CLI
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: docker/Dockerfile.cli
-          push: true
-          tags: ghcr.io/${{ github.repository }}/cli:${{ github.ref_name }},ghcr.io/${{ github.repository }}/cli:latest
+          tags: ghcr.io/${{ github.repository }}/client:${{ github.ref_name }},ghcr.io/${{ github.repository }}/client:latest
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -154,24 +144,23 @@ jobs:
             # Docker (recommended)
             git clone https://github.com/${{ github.repository }}
             cd free-fs
-            ./free-fs.sh up
-            ./free-fs.sh demo
+            chmod +x demo.sh
+            ./demo.sh
             ```
             ### Docker Images (GHCR)
             ```bash
-            docker pull ghcr.io/${{ github.repository }}/master:${{ github.ref_name }}
-            docker pull ghcr.io/${{ github.repository }}/chunk:${{ github.ref_name }}
-            docker pull ghcr.io/${{ github.repository }}/cli:${{ github.ref_name }}
+            docker pull ghcr.io/${{ github.repository }}/node:${{ github.ref_name }}
+            docker pull ghcr.io/${{ github.repository }}/client:${{ github.ref_name }}
             ```
             ### Binaries
             Download the pre-built binary for your platform below.
-            | Platform | Master | Chunk Server |
-            |----------|--------|-------------|
-            | Linux x86_64 | `free-fs-master-linux-amd64` | `free-fs-chunk-linux-amd64` |
-            | Linux ARM64 | `free-fs-master-linux-arm64` | `free-fs-chunk-linux-arm64` |
-            | macOS x86_64 | `free-fs-master-darwin-amd64` | `free-fs-chunk-darwin-amd64` |
-            | macOS Apple Silicon | `free-fs-master-darwin-arm64` | `free-fs-chunk-darwin-arm64` |
-            | Windows x86_64 | `free-fs-master-windows-amd64.exe` | `free-fs-chunk-windows-amd64.exe` |
+            | Platform | Node | Client |
+            |----------|------|--------|
+            | Linux x86_64 | `free-fs-node-linux-amd64` | `free-fs-client-linux-amd64` |
+            | Linux ARM64 | `free-fs-node-linux-arm64` | `free-fs-client-linux-arm64` |
+            | macOS x86_64 | `free-fs-node-darwin-amd64` | `free-fs-client-darwin-amd64` |
+            | macOS Apple Silicon | `free-fs-node-darwin-arm64` | `free-fs-client-darwin-arm64` |
+            | Windows x86_64 | `free-fs-node-windows-amd64.exe` | `free-fs-client-windows-amd64.exe` |
             ### Checksums
             See `checksums.txt` attached below.
           files: |
